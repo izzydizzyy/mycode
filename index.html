@@ -221,79 +221,300 @@ const languageList = document.getElementById("languageList");
 const lineCount = document.getElementById("lineCount");
 
 const languages = {
+  TypeScript: {
+    color: "#3178c6",
+    signals: [
+      [/\binterface\s+\w+/g, 3],
+      [/\btype\s+\w+\s*=/g, 3],
+      [/\benum\s+\w+/g, 3],
+      [/\bimplements\s+\w+/g, 3],
+      [/:\s*(string|number|boolean|void|unknown|any)\b/g, 2],
+      [/\bas\s+const\b/g, 2],
+      [/<\w+>\(/g, 1]
+    ]
+  },
   JavaScript: {
     color: "#f1e05a",
-    patterns: [
-      /\bconst\b/g,
-      /\blet\b/g,
-      /\bvar\b/g,
-      /\bfunction\b/g,
-      /=>/g,
-      /console\./g,
-      /document\./g,
-      /require\(/g,
-      /import .* from/g
+    signals: [
+      [/\bconst\s+\w+\s*=/g, 2],
+      [/\blet\s+\w+\s*=/g, 2],
+      [/=>\s*\{?/g, 2],
+      [/\bconsole\.\w+\(/g, 2],
+      [/\bdocument\.\w+/g, 2],
+      [/\brequire\(['"]/g, 2],
+      [/\bimport .* from ['"]/g, 2],
+      [/\bfunction\s*\w*\(/g, 1]
     ]
   },
-
   HTML: {
     color: "#e34c26",
-    patterns: [
-      /<!DOCTYPE html>/gi,
-      /<html/gi,
-      /<head/gi,
-      /<body/gi,
-      /<div/gi,
-      /<span/gi,
-      /<button/gi,
-      /<script/gi
+    signals: [
+      [/<!DOCTYPE html>/gi, 3],
+      [/<\/?(html|head|body|div|span|button|script|section|header|footer)\b/gi, 1]
     ]
   },
-
   CSS: {
     color: "#563d7c",
-    patterns: [
-      /#[a-zA-Z0-9_-]+\s*\{/g,
-      /\.[a-zA-Z0-9_-]+\s*\{/g,
-      /background\s*:/g,
-      /color\s*:/g,
-      /display\s*:/g,
-      /margin\s*:/g,
-      /padding\s*:/g,
-      /font-family\s*:/g
+    signals: [
+      [/[.#][a-zA-Z0-9_-]+\s*\{/g, 2],
+      [/@media\s*\(/g, 3],
+      [/(background|color|display|margin|padding|font-family)\s*:/g, 1]
     ]
   },
-
   Python: {
     color: "#3572A5",
-    patterns: [
-      /\bdef\b/g,
-      /\bimport\b/g,
-      /\bfrom\b.*\bimport\b/g,
-      /\bprint\(/g,
-      /\basync def\b/g,
-      /\bclass\b/g,
-      /__name__/g
+    signals: [
+      [/\bdef\s+\w+\(.*\):/g, 3],
+      [/\bself\b/g, 2],
+      [/\b__name__\b/g, 3],
+      [/\belif\b/g, 3],
+      [/\bimport\s+\w+/g, 1],
+      [/\bprint\(/g, 1],
+      [/\bclass\s+\w+.*:/g, 2]
     ]
   },
-
   JSON: {
-    color: "#aaa",
-    patterns: [
-      /"[^"]+"\s*:/g,
-      /\{\s*"/g
+    color: "#aaaaaa",
+    signals: [
+      [/^\s*\{/g, 1],
+      [/"[^"]+"\s*:\s*("[^"]*"|\d|true|false|null|\[|\{)/g, 2]
     ]
   },
-
   SQL: {
     color: "#e38c00",
-    patterns: [
-      /\bSELECT\b/gi,
-      /\bFROM\b/gi,
-      /\bWHERE\b/gi,
-      /\bINSERT INTO\b/gi,
-      /\bUPDATE\b/gi,
-      /\bCREATE TABLE\b/gi
+    signals: [
+      [/\bSELECT\b.*\bFROM\b/gi, 3],
+      [/\bINSERT INTO\b/gi, 3],
+      [/\bCREATE TABLE\b/gi, 3],
+      [/\bWHERE\b/gi, 1],
+      [/\bJOIN\b/gi, 1],
+      [/\bGROUP BY\b/gi, 2]
+    ]
+  },
+  Java: {
+    color: "#b07219",
+    signals: [
+      [/\bpublic\s+static\s+void\s+main\b/g, 3],
+      [/\bpublic\s+class\s+\w+/g, 3],
+      [/\bSystem\.out\.print/g, 3],
+      [/\bimport\s+java\./g, 3],
+      [/\bnew\s+\w+\(/g, 1],
+      [/\bthrows\s+\w+/g, 2]
+    ]
+  },
+  "C++": {
+    color: "#f34b7d",
+    signals: [
+      [/#include\s*<\w+>/g, 2],
+      [/\bstd::/g, 3],
+      [/\bcout\s*<</g, 3],
+      [/\bcin\s*>>/g, 3],
+      [/\btemplate\s*</g, 3],
+      [/\bnullptr\b/g, 3]
+    ]
+  },
+  C: {
+    color: "#555555",
+    signals: [
+      [/#include\s*<\w+\.h>/g, 3],
+      [/\bprintf\(/g, 2],
+      [/\bscanf\(/g, 3],
+      [/\bmalloc\(/g, 3],
+      [/\bstruct\s+\w+\s*\{/g, 2],
+      [/\bint\s+main\(/g, 1]
+    ]
+  },
+  "C#": {
+    color: "#178600",
+    signals: [
+      [/\busing System\b/g, 3],
+      [/\bConsole\.Write/g, 3],
+      [/\bnamespace\s+\w+/g, 2],
+      [/\bpublic\s+(class|void|static)\b/g, 1],
+      [/\{\s*get;\s*set;\s*\}/g, 3]
+    ]
+  },
+  Go: {
+    color: "#00ADD8",
+    signals: [
+      [/\bpackage\s+main\b/g, 3],
+      [/\bfunc\s+\w+\(/g, 2],
+      [/\bfmt\.\w+/g, 3],
+      [/:=/g, 2],
+      [/\bgo\s+func\b/g, 3]
+    ]
+  },
+  Rust: {
+    color: "#dea584",
+    signals: [
+      [/\bfn\s+\w+\(/g, 3],
+      [/\blet\s+mut\b/g, 3],
+      [/\bimpl\s+\w+/g, 3],
+      [/\bmatch\s+\w+\s*\{/g, 2],
+      [/\bprintln!\(/g, 3],
+      [/\buse\s+std::/g, 2]
+    ]
+  },
+  PHP: {
+    color: "#4F5D95",
+    signals: [
+      [/<\?php/g, 3],
+      [/\$\w+\s*=/g, 2],
+      [/\becho\b/g, 2],
+      [/->/g, 1],
+      [/\bfunction\s+\w+\(/g, 1]
+    ]
+  },
+  Ruby: {
+    color: "#701516",
+    signals: [
+      [/\bdef\s+\w+/g, 2],
+      [/\bend\b/g, 1],
+      [/\bputs\b/g, 3],
+      [/\battr_accessor\b/g, 3],
+      [/\bmodule\s+\w+/g, 2],
+      [/\bdo\s*\|.*\|/g, 3]
+    ]
+  },
+  Swift: {
+    color: "#F05138",
+    signals: [
+      [/\bfunc\s+\w+\(/g, 2],
+      [/\bvar\s+\w+\s*:\s*\w+/g, 2],
+      [/\bimport\s+(UIKit|SwiftUI|Foundation)\b/g, 3],
+      [/\bguard\s+let\b/g, 3],
+      [/\bstruct\s+\w+\s*:/g, 2]
+    ]
+  },
+  Kotlin: {
+    color: "#A97BFF",
+    signals: [
+      [/\bfun\s+\w+\(/g, 3],
+      [/\bval\s+\w+\s*[:=]/g, 2],
+      [/\bwhen\s*\(/g, 2],
+      [/\bcompanion object\b/g, 3],
+      [/\bdata class\b/g, 3]
+    ]
+  },
+  Shell: {
+    color: "#89e051",
+    signals: [
+      [/^#!.*\b(bash|sh|zsh)\b/gm, 3],
+      [/\bfi\b/g, 2],
+      [/\bdone\b/g, 2],
+      [/\$\{[^}]+\}/g, 1],
+      [/\bexport\s+\w+=/g, 2],
+      [/\bif\s*\[\s/g, 2]
+    ]
+  },
+  YAML: {
+    color: "#cb171e",
+    signals: [
+      [/^---\s*$/gm, 3],
+      [/^\s*-\s+\w[\w-]*:/gm, 2],
+      [/^[\w-]+:\s*$/gm, 1]
+    ]
+  },
+  Markdown: {
+    color: "#083fa1",
+    signals: [
+      [/^#{1,6}\s+\S/gm, 3],
+      [/\*\*[^*]+\*\*/g, 1],
+      [/^\s*[-*]\s+\S/gm, 1],
+      [/\[[^\]]+\]\([^)]+\)/g, 2]
+    ]
+  },
+  XML: {
+    color: "#0060ac",
+    signals: [
+      [/<\?xml/gi, 3],
+      [/xmlns:/g, 3],
+      [/<\/\w+>/g, 1]
+    ]
+  },
+  Dart: {
+    color: "#00B4AB",
+    signals: [
+      [/\bvoid\s+main\(/g, 2],
+      [/\bimport\s+'package:/g, 3],
+      [/\bWidget\s+build\(/g, 3],
+      [/\bStatelessWidget\b/g, 3],
+      [/\bStatefulWidget\b/g, 3]
+    ]
+  },
+  Scala: {
+    color: "#c22d40",
+    signals: [
+      [/\bobject\s+\w+\s+extends\b/g, 3],
+      [/\bval\s+\w+\s*=/g, 1],
+      [/\bcase class\b/g, 3],
+      [/\bimport\s+scala\./g, 3]
+    ]
+  },
+  R: {
+    color: "#198CE7",
+    signals: [
+      [/<-\s*function\(/g, 3],
+      [/\blibrary\(/g, 2],
+      [/\bggplot\(/g, 3],
+      [/<-\s*c\(/g, 2]
+    ]
+  },
+  Perl: {
+    color: "#0298c3",
+    signals: [
+      [/\buse strict\b/g, 3],
+      [/\buse warnings\b/g, 3],
+      [/\bmy\s+\$\w+/g, 2],
+      [/\bsub\s+\w+\s*\{/g, 2]
+    ]
+  },
+  Lua: {
+    color: "#000080",
+    signals: [
+      [/\blocal\s+\w+\s*=/g, 2],
+      [/\bfunction\s+\w+\(/g, 1],
+      [/\brequire\(['"]/g, 1],
+      [/\bnil\b/g, 2]
+    ]
+  },
+  Haskell: {
+    color: "#5e5086",
+    signals: [
+      [/::\s*\w+\s*->/g, 3],
+      [/\bmodule\s+\w+\s+where\b/g, 3],
+      [/\bimport\s+Data\./g, 2],
+      [/\bdata\s+\w+\s*=/g, 2]
+    ]
+  },
+  "Objective-C": {
+    color: "#438eff",
+    signals: [
+      [/#import\s*<\w+\/\w+\.h>/g, 3],
+      [/@interface\b/g, 3],
+      [/@implementation\b/g, 3],
+      [/\[\w+\s+\w+\]/g, 1],
+      [/\bNSLog\(/g, 3]
+    ]
+  },
+  Dockerfile: {
+    color: "#384d54",
+    signals: [
+      [/^FROM\s+\S+/gm, 3],
+      [/^RUN\s+/gm, 2],
+      [/^COPY\s+/gm, 2],
+      [/^WORKDIR\s+/gm, 2],
+      [/^EXPOSE\s+\d+/gm, 3],
+      [/^ENTRYPOINT\s+/gm, 3]
+    ]
+  },
+  GraphQL: {
+    color: "#e10098",
+    signals: [
+      [/\btype\s+\w+\s*\{/g, 2],
+      [/\bquery\s+\w*\s*\{/g, 3],
+      [/\bmutation\s+\w*\s*\{/g, 3],
+      [/\bfragment\s+\w+\s+on\b/g, 3]
     ]
   }
 };
@@ -324,11 +545,11 @@ function analyze() {
 
     let score = 0;
 
-    data.patterns.forEach(pattern => {
+    data.signals.forEach(([pattern, weight]) => {
       const matches = code.match(pattern);
 
       if (matches) {
-        score += matches.length;
+        score += matches.length * weight;
       }
     });
 
@@ -349,13 +570,17 @@ function analyze() {
     return;
   }
 
-  const sorted = Object.entries(scores)
-    .sort((a, b) => b[1] - a[1]);
+  const filtered = Object.entries(scores)
+    .filter(([, score]) => score / total >= 0.03);
+
+  const filteredTotal = filtered.reduce((sum, [, s]) => sum + s, 0);
+
+  const sorted = filtered.sort((a, b) => b[1] - a[1]);
 
   sorted.forEach(([language, score]) => {
 
     const percentage =
-      ((score / total) * 100).toFixed(1);
+      ((score / filteredTotal) * 100).toFixed(1);
 
     const color = languages[language].color;
 
