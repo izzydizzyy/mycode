@@ -24,12 +24,36 @@ Use mycode here:
 
 Currently detects:
 
-- JavaScript
-- HTML
-- CSS
-- Python
-- JSON
-- SQL
+JavaScript
+TypeScript
+HTML
+CSS
+Python
+JSON
+SQL
+Java
+C
+C++
+C#
+Go
+Rust
+PHP
+Ruby
+Swift
+Kotlin
+Shell
+YAML
+Markdown
+XML
+Dart
+Scala
+R
+Perl
+Lua
+Haskell
+Objective-C
+Dockerfile
+GraphQL
 
 More languages will be added over time.
 
