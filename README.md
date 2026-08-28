@@ -80,4 +80,4 @@ Your code is not uploaded, stored, or sent to a server.
 - Better language detection
 
 ## PhotoShoot
-![PhotoShoot](screenshots/photoshoot.png)
+![PhotoShoot](photoshoot.png)
