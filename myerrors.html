@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>myerrors</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #000;
+  color: #f5f5f5;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.container {
+  width: 90%;
+  max-width: 900px;
+  margin: 70px auto;
+}
+
+header {
+  margin-bottom: 35px;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.logo span {
+  color: #777;
+}
+
+.subtitle {
+  margin-top: 8px;
+  color: #777;
+  font-size: 14px;
+}
+
+.editor {
+  background: #050505;
+  border: 1px solid #222;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.editor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 15px;
+  border-bottom: 1px solid #1c1c1c;
+  font-size: 13px;
+  color: #777;
+}
+
+textarea {
+  width: 100%;
+  height: 340px;
+  padding: 18px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+
+  background: #050505;
+  color: #ddd;
+
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  border: 1px solid #292929;
+  background: #111;
+  color: #eee;
+
+  padding: 9px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+button:hover {
+  background: #181818;
+}
+
+.clear {
+  color: #888;
+}
+
+.results {
+  margin-top: 35px;
+  padding-top: 25px;
+  border-top: 1px solid #222;
+  display: none;
+}
+
+.results h2 {
+  margin: 0 0 18px;
+  font-size: 16px;
+}
+
+.summary {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-error { background: #ff4d4d; }
+.dot-warn  { background: #f1c40f; }
+.dot-clean { background: #2ecc71; }
+
+.issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.issue {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #1c1c1c;
+  border-radius: 6px;
+  background: #0a0a0a;
+}
+
+.issue-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  height: fit-content;
+  white-space: nowrap;
+}
+
+.badge-error {
+  background: rgba(255, 77, 77, 0.15);
+  color: #ff6b6b;
+}
+
+.badge-warn {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f1c40f;
+}
+
+.issue-body {
+  font-size: 13px;
+}
+
+.issue-line {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.issue-msg {
+  color: #ddd;
+}
+
+.clean-msg {
+  color: #2ecc71;
+  font-size: 13px;
+}
+
+footer {
+  margin-top: 50px;
+  padding-top: 20px;
+  border-top: 1px solid #181818;
+
+  color: #444;
+  font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="logo">my<span>errors</span></div>
+    <div class="subtitle">
+      Paste code. Find what's broken.
+    </div>
+  </header>
+
+  <div class="editor">
+
+    <div class="editor-top">
+      <span>code</span>
+      <span id="lineCount">0 lines</span>
+    </div>
+
+    <textarea
+      id="code"
+      spellcheck="false"
+      placeholder="// paste your code here..."
+    ></textarea>
+
+  </div>
+
+  <div class="actions">
+    <button onclick="check()">Check</button>
+    <button class="clear" onclick="clearCode()">Clear</button>
+  </div>
+
+  <div class="results" id="results">
+
+    <h2>Issues</h2>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="issue-list" id="issueList"></div>
+
+  </div>
+
+  <footer>
+    myerrors / code stays in your browser
+  </footer>
+
+</div>
+
+<script>
+const codeBox = document.getElementById("code");
+const results = document.getElementById("results");
+const summary = document.getElementById("summary");
+const issueList = document.getElementById("issueList");
+const lineCount = document.getElementById("lineCount");
+
+codeBox.addEventListener("input", () => {
+  const value = codeBox.value.trim();
+
+  if (!value) {
+    lineCount.textContent = "0 lines";
+    return;
+  }
+
+  const lines = codeBox.value.split("\n").length;
+
+  lineCount.textContent =
+    lines === 1 ? "1 line" : `${lines} lines`;
+});
+
+function stripNoise(code) {
+  let out = "";
+  let i = 0;
+  let inString = null; 
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  while (i < code.length) {
+    const c = code[i];
+    const next = code[i + 1];
+
+    if (inLineComment) {
+      if (c === "\n") { inLineComment = false; out += c; }
+      else out += " ";
+      i++; continue;
+    }
+
+    if (inBlockComment) {
+      if (c === "*" && next === "/") { inBlockComment = false; out += "  "; i += 2; continue; }
+      out += c === "\n" ? "\n" : " ";
+      i++; continue;
+    }
+
+    if (inString) {
+      if (c === "\\") { out += "  "; i += 2; continue; }
+      if (c === inString) { inString = null; out += " "; i++; continue; }
+      out += c === "\n" ? "\n" : " ";
+      i++; continue;
+    }
+
+    if (c === "/" && next === "/") { inLineComment = true; out += "  "; i += 2; continue; }
+    if (c === "/" && next === "*") { inBlockComment = true; out += "  "; i += 2; continue; }
+    if (c === "#" ) { inLineComment = true; out += " "; i += 1; continue; }
+    if (c === "'" || c === '"' || c === "`") { inString = c; out += " "; i++; continue; }
+
+    out += c;
+    i++;
+  }
+
+  return out;
+}
+
+function lineOf(code, index) {
+  return code.slice(0, index).split("\n").length;
+}
+
+function detectLanguage(code) {
+  if (/^\s*<!DOCTYPE html>|<html[\s>]/i.test(code)) return "html";
+  if (/^\s*(def |class |import |from .* import |print\()/m.test(code) && !/;\s*$/m.test(code)) return "python";
+  if (/\binterface\s+\w+|\btype\s+\w+\s*=|\benum\s+\w+/.test(code)) return "typescript";
+  if (/\bfunction\b|=>|\bconst\b|\blet\b|console\./.test(code)) return "javascript";
+  return "generic";
+}
+
+function checkBrackets(clean) {
+  const pairs = { "(": ")", "[": "]", "{": "}" };
+  const closers = { ")": "(", "]": "[", "}": "{" };
+  const stack = [];
+  const issues = [];
+
+  for (let i = 0; i < clean.length; i++) {
+    const c = clean[i];
+    if (pairs[c]) {
+      stack.push({ char: c, index: i });
+    } else if (closers[c]) {
+      if (stack.length === 0 || stack[stack.length - 1].char !== closers[c]) {
+        issues.push({
+          type: "error",
+          line: lineOf(clean, i),
+          message: `Unexpected closing '${c}' with no matching '${closers[c]}'`
+        });
+      } else {
+        stack.pop();
+      }
+    }
+  }
+
+  stack.forEach(open => {
+    issues.push({
+      type: "error",
+      line: lineOf(clean, open.index),
+      message: `Unclosed '${open.char}' — never closed with '${pairs[open.char]}'`
+    });
+  });
+
+  return issues;
+}
+
+function checkQuotes(raw) {
+  const issues = [];
+  const lines = raw.split("\n");
+
+  lines.forEach((line, idx) => {
+    ["'", '"'].forEach(q => {
+      let count = 0;
+      for (let i = 0; i < line.length; i++) {
+        if (line[i] === "\\") { i++; continue; }
+        if (line[i] === q) count++;
+      }
+      if (count % 2 !== 0) {
+        issues.push({
+          type: "warn",
+          line: idx + 1,
+          message: `Odd number of ${q === '"' ? "double" : "single"} quotes on this line — possible unclosed string`
+        });
+      }
+    });
+  });
+
+  return issues;
+}
+
+function checkHtmlTags(raw) {
+  const issues = [];
+  const voidTags = new Set(["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"]);
+  const stack = [];
+  const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9-]*)[^>]*?(\/?)>/g;
+  let m;
+
+  while ((m = tagRegex.exec(raw)) !== null) {
+    const isClosing = m[0][1] === "/";
+    const tag = m[1].toLowerCase();
+    const selfClosed = m[2] === "/" || voidTags.has(tag);
+    const line = lineOf(raw, m.index);
+
+    if (isClosing) {
+      if (stack.length === 0) {
+        issues.push({ type: "error", line, message: `Closing tag </${tag}> has no matching opening tag` });
+      } else {
+        const last = stack[stack.length - 1];
+        if (last.tag === tag) {
+          stack.pop();
+        } else {
+          const matchIdx = stack.map(s => s.tag).lastIndexOf(tag);
+          if (matchIdx !== -1) {
+            issues.push({ type: "warn", line, message: `Mismatched tag: expected </${last.tag}> before </${tag}>` });
+            stack.length = matchIdx;
+          } else {
+            issues.push({ type: "error", line, message: `Closing tag </${tag}> doesn't match any open tag` });
+          }
+        }
+      }
+    } else if (!selfClosed) {
+      stack.push({ tag, line });
+    }
+  }
+
+  stack.forEach(open => {
+    issues.push({ type: "error", line: open.line, message: `<${open.tag}> is never closed` });
+  });
+
+  return issues;
+}
+
+function checkPython(raw) {
+  const issues = [];
+  const lines = raw.split("\n");
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    const stripped = trimmed.replace(/#.*$/, "").trimEnd();
+
+    if (/^(if|elif|else|for|while|def|class|try|except|finally|with)\b.*[^:]$/.test(stripped) && stripped.length > 0) {
+      if (!/[\\,({\[]$/.test(stripped)) {
+        issues.push({
+          type: "warn",
+          line: idx + 1,
+          message: `Line looks like it should end with ':' — "${trimmed.slice(0, 50)}"`
+        });
+      }
+    }
+
+    if (/\t/.test(line) && lines.some(l => /^ {2,}\S/.test(l))) {
+      issues.push({
+        type: "warn",
+        line: idx + 1,
+        message: "Mixed tabs and spaces for indentation"
+      });
+    }
+  });
+
+  return issues;
+}
+
+function checkJs(raw, clean) {
+  const issues = [];
+  const lines = raw.split("\n");
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    if (/==[^=]/.test(trimmed) && !/===/.test(trimmed)) {
+      issues.push({
+        type: "warn",
+        line: idx + 1,
+        message: "Using '==' instead of '===' can cause unexpected type coercion"
+      });
+    }
+    if (/\bvar\b/.test(trimmed)) {
+      issues.push({
+        type: "warn",
+        line: idx + 1,
+        message: "'var' is function-scoped and largely outdated — consider 'let' or 'const'"
+      });
+    }
+    if (/console\.log\(/.test(trimmed)) {
+      issues.push({
+        type: "warn",
+        line: idx + 1,
+        message: "Leftover console.log — remember to remove debug statements"
+      });
+    }
+  });
+
+  return issues;
+}
+
+function checkGeneric(raw) {
+  const issues = [];
+  const lines = raw.split("\n");
+
+  lines.forEach((line, idx) => {
+    if (line.length > 120) {
+      issues.push({
+        type: "warn",
+        line: idx + 1,
+        message: `Line is ${line.length} characters — consider breaking it up`
+      });
+    }
+    if (/\s+$/.test(line) && line.trim().length > 0) {
+      issues.push({
+        type: "warn",
+        line: idx + 1,
+        message: "Trailing whitespace"
+      });
+    }
+  });
+
+  return issues;
+}
+
+function check() {
+  const raw = codeBox.value;
+
+  if (!raw.trim()) return;
+
+  const clean = stripNoise(raw);
+  const lang = detectLanguage(raw);
+
+  let issues = [];
+
+  issues = issues.concat(checkBrackets(clean));
+  issues = issues.concat(checkQuotes(raw));
+  issues = issues.concat(checkGeneric(raw));
+
+  if (lang === "html") {
+    issues = issues.concat(checkHtmlTags(raw));
+  }
+  if (lang === "python") {
+    issues = issues.concat(checkPython(raw));
+  }
+  if (lang === "javascript" || lang === "typescript") {
+    issues = issues.concat(checkJs(raw, clean));
+  }
+
+  issues.sort((a, b) => a.line - b.line);
+
+  const errorCount = issues.filter(i => i.type === "error").length;
+  const warnCount = issues.filter(i => i.type === "warn").length;
+
+  summary.innerHTML = "";
+  issueList.innerHTML = "";
+
+  if (issues.length === 0) {
+    summary.innerHTML = `
+      <div class="summary-item">
+        <span class="summary-dot dot-clean"></span>
+        No issues found
+      </div>
+    `;
+    issueList.innerHTML = '<div class="clean-msg">Looks clean! No obvious errors detected.</div>';
+    results.style.display = "block";
+    return;
+  }
+
+  summary.innerHTML = `
+    <div class="summary-item">
+      <span class="summary-dot dot-error"></span>
+      ${errorCount} error${errorCount === 1 ? "" : "s"}
+    </div>
+    <div class="summary-item">
+      <span class="summary-dot dot-warn"></span>
+      ${warnCount} warning${warnCount === 1 ? "" : "s"}
+    </div>
+  `;
+
+  issues.forEach(issue => {
+    const el = document.createElement("div");
+    el.className = "issue";
+
+    const badgeClass = issue.type === "error" ? "badge-error" : "badge-warn";
+    const badgeText = issue.type === "error" ? "ERROR" : "WARN";
+
+    el.innerHTML = `
+      <span class="issue-badge ${badgeClass}">${badgeText}</span>
+      <div class="issue-body">
+        <div class="issue-line">Line ${issue.line}</div>
+        <div class="issue-msg">${issue.message}</div>
+      </div>
+    `;
+
+    issueList.appendChild(el);
+  });
+
+  results.style.display = "block";
+}
+
+function clearCode() {
+  codeBox.value = "";
+  results.style.display = "none";
+  lineCount.textContent = "0 lines";
+}
+</script>
+
+</body>
+</html>
