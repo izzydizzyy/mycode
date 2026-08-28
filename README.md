@@ -24,36 +24,36 @@ Use mycode here:
 
 Currently detects:
 
-JavaScript
-TypeScript
-HTML
-CSS
-Python
-JSON
-SQL
-Java
-C
-C++
-C#
-Go
-Rust
-PHP
-Ruby
-Swift
-Kotlin
-Shell
-YAML
-Markdown
-XML
-Dart
-Scala
-R
-Perl
-Lua
-Haskell
-Objective-C
-Dockerfile
-GraphQL
+- JavaScript
+- TypeScript
+- HTML
+- CSS
+- Python
+- JSON
+- SQL
+- Java
+- C
+- C++
+- C#
+- Go
+- Rust
+- PHP
+- Ruby
+- Swift
+- Kotlin
+- Shell
+- YAML
+- Markdown
+- XML
+- Dart
+- Scala
+- R
+- Perl
+- Lua
+- Haskell
+- Objective-C
+- Dockerfile
+- GraphQL
 
 More languages will be added over time.
 
@@ -79,6 +79,5 @@ Your code is not uploaded, stored, or sent to a server.
 - Project/folder analysis
 - Better language detection
 
-## License
-
-MIT
+## PhotoShoot
+![PhotoShoot](screenshots/photoshoot.png)
