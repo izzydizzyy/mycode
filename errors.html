@@ -269,12 +269,52 @@ codeBox.addEventListener("input", () => {
     lines === 1 ? "1 line" : `${lines} lines`;
 });
 
-function stripNoise(code) {
+function lineOf(code, index) {
+  return code.slice(0, index).split("\n").length;
+}
+
+// Characters after which a following '/' is almost always the start of a
+// regex literal rather than a division operator. Used only as a heuristic.
+const REGEX_PRECEDERS = new Set([
+  "(", "[", "{", ",", ";", ":", "=", "!", "&", "|", "?", "+", "-",
+  "*", "%", "^", "~", "<", ">"
+]);
+const REGEX_PRECEDING_WORDS = new Set([
+  "return", "typeof", "instanceof", "in", "of", "new", "delete",
+  "void", "throw", "case", "do", "else", "yield", "await"
+]);
+
+/**
+ * Single pass over the code that:
+ *  - blanks out comments, strings, and (heuristically) regex literals so
+ *    later checks don't get confused by brackets/quotes/keywords inside them
+ *  - reports real syntax problems it notices along the way (unterminated
+ *    strings/comments), instead of guessing from raw text line-by-line
+ * Blanked characters are replaced with spaces (or kept as newlines) so that
+ * line numbers and column positions stay identical to the original source.
+ */
+function analyzeCode(code) {
   let out = "";
   let i = 0;
-  let inString = null; 
+  let inString = null;
+  let stringStartIndex = -1;
   let inLineComment = false;
   let inBlockComment = false;
+  let blockCommentStartIndex = -1;
+  const issues = [];
+
+  function lastWord() {
+    // last run of letters emitted so far, ignoring trailing whitespace
+    const m = out.match(/([A-Za-z_$][A-Za-z0-9_$]*)\s*$/);
+    return m ? m[1] : "";
+  }
+
+  function lastNonSpaceChar() {
+    for (let k = out.length - 1; k >= 0; k--) {
+      if (out[k] !== " " && out[k] !== "\n") return out[k];
+    }
+    return "";
+  }
 
   while (i < code.length) {
     const c = code[i];
@@ -293,26 +333,100 @@ function stripNoise(code) {
     }
 
     if (inString) {
-      if (c === "\\") { out += "  "; i += 2; continue; }
+      if (c === "\\" && inString !== "`") { out += "  "; i += 2; continue; }
+      if (c === "\n") {
+        if (inString === "`") {
+          // backtick strings may legitimately span multiple lines
+          out += "\n";
+          i++; continue;
+        }
+        issues.push({
+          type: "error",
+          line: lineOf(code, stringStartIndex),
+          message: `Unterminated ${inString === '"' ? "double" : "single"}-quoted string starting here`
+        });
+        inString = null;
+        // don't consume the newline as part of the string
+        continue;
+      }
       if (c === inString) { inString = null; out += " "; i++; continue; }
-      out += c === "\n" ? "\n" : " ";
+      out += " ";
       i++; continue;
     }
 
     if (c === "/" && next === "/") { inLineComment = true; out += "  "; i += 2; continue; }
-    if (c === "/" && next === "*") { inBlockComment = true; out += "  "; i += 2; continue; }
-    if (c === "#" ) { inLineComment = true; out += " "; i += 1; continue; }
-    if (c === "'" || c === '"' || c === "`") { inString = c; out += " "; i++; continue; }
+    if (c === "/" && next === "*") {
+      inBlockComment = true;
+      blockCommentStartIndex = i;
+      out += "  "; i += 2; continue;
+    }
+    if (c === "#") { inLineComment = true; out += " "; i += 1; continue; }
+
+    if (c === "'" || c === '"' || c === "`") {
+      inString = c;
+      stringStartIndex = i;
+      out += " "; i++; continue;
+    }
+
+    // Heuristic regex-literal detection so patterns like /\(/ or /[{}]/
+    // don't get mistaken for real brackets.
+    if (c === "/") {
+      const prevChar = lastNonSpaceChar();
+      const prevWord = lastWord();
+      const looksLikeRegexStart =
+        prevChar === "" ||
+        REGEX_PRECEDERS.has(prevChar) ||
+        REGEX_PRECEDING_WORDS.has(prevWord);
+
+      if (looksLikeRegexStart) {
+        let j = i + 1;
+        let sawContent = false;
+        let closed = false;
+        while (j < code.length && code[j] !== "\n") {
+          if (code[j] === "\\") { j += 2; sawContent = true; continue; }
+          if (code[j] === "[") {
+            // character class: '/' inside it doesn't end the regex
+            j++;
+            while (j < code.length && code[j] !== "]" && code[j] !== "\n") j++;
+            j++;
+            sawContent = true;
+            continue;
+          }
+          if (code[j] === "/") { closed = true; j++; break; }
+          sawContent = true;
+          j++;
+        }
+        if (closed && sawContent) {
+          // consume optional flags
+          while (j < code.length && /[a-z]/i.test(code[j])) j++;
+          out += " ".repeat(j - i);
+          i = j;
+          continue;
+        }
+        // didn't look like a real regex after all — fall through as division
+      }
+    }
 
     out += c;
     i++;
   }
 
-  return out;
-}
+  if (inBlockComment) {
+    issues.push({
+      type: "error",
+      line: lineOf(code, blockCommentStartIndex),
+      message: "Unterminated block comment /* ... */ starting here"
+    });
+  }
+  if (inString && inString !== "`") {
+    issues.push({
+      type: "error",
+      line: lineOf(code, stringStartIndex),
+      message: `Unterminated ${inString === '"' ? "double" : "single"}-quoted string starting here`
+    });
+  }
 
-function lineOf(code, index) {
-  return code.slice(0, index).split("\n").length;
+  return { clean: out, issues };
 }
 
 function detectLanguage(code) {
@@ -357,42 +471,64 @@ function checkBrackets(clean) {
   return issues;
 }
 
-function checkQuotes(raw) {
-  const issues = [];
-  const lines = raw.split("\n");
+// Strips <!-- comments --> and the contents of <script>/<style> blocks
+// (replacing with spaces, preserving newlines) so tag matching doesn't
+// get confused by JS/CSS that happens to contain '<' or '>'.
+function stripHtmlNoise(raw) {
+  let out = "";
+  let i = 0;
 
-  lines.forEach((line, idx) => {
-    ["'", '"'].forEach(q => {
-      let count = 0;
-      for (let i = 0; i < line.length; i++) {
-        if (line[i] === "\\") { i++; continue; }
-        if (line[i] === q) count++;
-      }
-      if (count % 2 !== 0) {
-        issues.push({
-          type: "warn",
-          line: idx + 1,
-          message: `Odd number of ${q === '"' ? "double" : "single"} quotes on this line — possible unclosed string`
-        });
-      }
-    });
-  });
+  while (i < raw.length) {
+    if (raw.startsWith("<!--", i)) {
+      const end = raw.indexOf("-->", i + 4);
+      const stop = end === -1 ? raw.length : end + 3;
+      for (let k = i; k < stop; k++) out += raw[k] === "\n" ? "\n" : " ";
+      i = stop;
+      continue;
+    }
 
-  return issues;
+    const scriptMatch = /^<script\b[^>]*>/i.exec(raw.slice(i));
+    if (scriptMatch) {
+      out += scriptMatch[0];
+      i += scriptMatch[0].length;
+      const end = raw.slice(i).search(/<\/script\s*>/i);
+      const stop = end === -1 ? raw.length : i + end;
+      for (let k = i; k < stop; k++) out += raw[k] === "\n" ? "\n" : " ";
+      i = stop;
+      continue;
+    }
+
+    const styleMatch = /^<style\b[^>]*>/i.exec(raw.slice(i));
+    if (styleMatch) {
+      out += styleMatch[0];
+      i += styleMatch[0].length;
+      const end = raw.slice(i).search(/<\/style\s*>/i);
+      const stop = end === -1 ? raw.length : i + end;
+      for (let k = i; k < stop; k++) out += raw[k] === "\n" ? "\n" : " ";
+      i = stop;
+      continue;
+    }
+
+    out += raw[i];
+    i++;
+  }
+
+  return out;
 }
 
 function checkHtmlTags(raw) {
+  const cleaned = stripHtmlNoise(raw);
   const issues = [];
   const voidTags = new Set(["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"]);
   const stack = [];
   const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9-]*)[^>]*?(\/?)>/g;
   let m;
 
-  while ((m = tagRegex.exec(raw)) !== null) {
+  while ((m = tagRegex.exec(cleaned)) !== null) {
     const isClosing = m[0][1] === "/";
     const tag = m[1].toLowerCase();
     const selfClosed = m[2] === "/" || voidTags.has(tag);
-    const line = lineOf(raw, m.index);
+    const line = lineOf(cleaned, m.index);
 
     if (isClosing) {
       if (stack.length === 0) {
@@ -441,11 +577,15 @@ function checkPython(raw) {
       }
     }
 
-    if (/\t/.test(line) && lines.some(l => /^ {2,}\S/.test(l))) {
+    // Flag only genuine mixing WITHIN this line's own leading whitespace,
+    // e.g. a tab followed by a space (or vice versa) before the first
+    // real character — not just "this file uses tabs somewhere".
+    const leading = line.match(/^[ \t]*/)[0];
+    if (/\t/.test(leading) && / /.test(leading)) {
       issues.push({
         type: "warn",
         line: idx + 1,
-        message: "Mixed tabs and spaces for indentation"
+        message: "Mixed tabs and spaces within this line's indentation"
       });
     }
   });
@@ -455,10 +595,16 @@ function checkPython(raw) {
 
 function checkJs(raw, clean) {
   const issues = [];
-  const lines = raw.split("\n");
+  const rawLines = raw.split("\n");
+  const cleanLines = clean.split("\n");
 
-  lines.forEach((line, idx) => {
-    const trimmed = line.trim();
+  rawLines.forEach((line, idx) => {
+    // Use the noise-stripped version of this line for detection so we
+    // don't flag '==', 'var', etc. when they appear inside a string or
+    // comment instead of actual code.
+    const codeLine = cleanLines[idx] !== undefined ? cleanLines[idx] : line;
+    const trimmed = codeLine.trim();
+
     if (/==[^=]/.test(trimmed) && !/===/.test(trimmed)) {
       issues.push({
         type: "warn",
@@ -509,18 +655,28 @@ function checkGeneric(raw) {
   return issues;
 }
 
+function dedupe(issues) {
+  const seen = new Set();
+  return issues.filter(issue => {
+    const key = `${issue.type}|${issue.line}|${issue.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function check() {
   const raw = codeBox.value;
 
   if (!raw.trim()) return;
 
-  const clean = stripNoise(raw);
+  const { clean, issues: noiseIssues } = analyzeCode(raw);
   const lang = detectLanguage(raw);
 
   let issues = [];
 
+  issues = issues.concat(noiseIssues);
   issues = issues.concat(checkBrackets(clean));
-  issues = issues.concat(checkQuotes(raw));
   issues = issues.concat(checkGeneric(raw));
 
   if (lang === "html") {
@@ -533,6 +689,7 @@ function check() {
     issues = issues.concat(checkJs(raw, clean));
   }
 
+  issues = dedupe(issues);
   issues.sort((a, b) => a.line - b.line);
 
   const errorCount = issues.filter(i => i.type === "error").length;
